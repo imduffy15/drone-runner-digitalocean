@@ -39,7 +39,7 @@ func TestGetters(t *testing.T) {
 	pipeline := &Pipeline{
 		Version:  "1.0.0",
 		Kind:     "pipeline",
-		Type:     "digitalocean",
+		Type:     "gcp",
 		Name:     "default",
 		Deps:     []string{"before"},
 		Platform: platform,

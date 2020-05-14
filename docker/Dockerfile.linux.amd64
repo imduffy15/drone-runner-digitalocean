@@ -8,5 +8,5 @@ ENV GODEBUG netdns=go
 
 COPY --from=alpine /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
-ADD release/linux/amd64/drone-runner-digitalocean /bin/
-ENTRYPOINT ["/bin/drone-runner-digitalocean"]
+ADD release/linux/amd64/drone-runner-gcp /bin/
+ENTRYPOINT ["/bin/drone-runner-gcp"]

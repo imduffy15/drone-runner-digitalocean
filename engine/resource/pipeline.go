@@ -16,7 +16,7 @@ var (
 // Defines the Resource Kind and Type.
 const (
 	Kind = "pipeline"
-	Type = "digitalocean"
+	Type = "gcp"
 )
 
 type (
@@ -31,7 +31,6 @@ type (
 		Server    Server              `json:"server,omitempty"`
 		Clone     manifest.Clone      `json:"clone,omitempty"`
 		Platform  manifest.Platform   `json:"platform,omitempty"`
-		Token     manifest.Variable   `json:"token,omitempty"`
 		Trigger   manifest.Conditions `json:"conditions,omitempty"`
 		Workspace manifest.Workspace  `json:"workspace,omitempty"`
 
@@ -40,10 +39,11 @@ type (
 
 	// Server defines a remote server.
 	Server struct {
-		Image  string `json:"image,omitempty"`
-		Region string `json:"region,omitempty"`
-		Size   string `json:"size,omitempty"`
-		User   string `json:"user,omitempty`
+		Image     string `json:"image,omitempty"`
+		Region    string `json:"region,omitempty"`
+		Size      string `json:"size,omitempty"`
+		User      string `json:"user,omitempty"`
+		ProjectID string `json:"project_id,omitempty" yaml:"project_id"`
 	}
 
 	// Step defines a Pipeline step.

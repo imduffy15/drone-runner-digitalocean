@@ -9,10 +9,12 @@ import (
 	"context"
 	"io"
 	"io/ioutil"
+	"net"
 	"os"
 	"strings"
+	"time"
 
-	"github.com/drone-runners/drone-runner-digitalocean/internal/platform"
+	"github.com/drone-runners/drone-runner-gcp/internal/platform"
 	"github.com/drone/runner-go/logger"
 
 	"github.com/pkg/sftp"
@@ -29,51 +31,42 @@ func New(publickeyFile, privatekeyFile string) (Engine, error) {
 	if err != nil {
 		return nil, err
 	}
-	fingerprint, err := calcFingerprint(publickey)
-	if err != nil {
-		return nil, err
-	}
 	return &engine{
-		publickey:   string(publickey),
-		privatekey:  string(privatekey),
-		fingerprint: fingerprint,
+		publickey:  string(publickey),
+		privatekey: string(privatekey),
 	}, err
 }
 
 type engine struct {
-	privatekey  string
-	publickey   string
-	fingerprint string
+	privatekey string
+	publickey  string
 }
 
 // Setup the pipeline environment.
 func (e *engine) Setup(ctx context.Context, spec *Spec) error {
-	err := platform.RegisterKey(ctx, platform.RegisterArgs{
-		Fingerprint: e.fingerprint,
-		Name:        "drone_runner_key",
-		Data:        e.publickey,
-		Token:       spec.Token,
+	// provision the server instance.
+	instance, err := platform.Provision(ctx, platform.ProvisionArgs{
+		Key:       e.publickey,
+		Image:     spec.Server.Image,
+		Name:      spec.Server.Name,
+		Region:    spec.Server.Region,
+		Size:      spec.Server.Size,
+		ProjectID: spec.Server.ProjectID,
+		User:      spec.Server.User,
 	})
 	if err != nil {
+		logger.FromContext(ctx).
+			WithError(err).
+			WithField("hostname", spec.Server.Name).
+			WithField("user", spec.Server.User).
+			WithField("ip", instance.IP).
+			WithField("id", instance.ID).
+			Debug("failed to provision instance")
 		return err
 	}
 
-	// provision the server instance.
-	instance, err := platform.Provision(ctx, platform.ProvisionArgs{
-		Key:    e.fingerprint,
-		Image:  spec.Server.Image,
-		Name:   spec.Server.Name,
-		Region: spec.Server.Region,
-		Size:   spec.Server.Size,
-		Token:  spec.Token,
-	})
-	if instance.ID > 0 {
-		spec.id = instance.ID
-		spec.ip = instance.IP
-	}
-	if err != nil {
-		return err
-	}
+	spec.id = instance.ID
+	spec.ip = instance.IP
 
 	logger.FromContext(ctx).
 		WithField("hostname", spec.Server.Name).
@@ -85,6 +78,7 @@ func (e *engine) Setup(ctx context.Context, spec *Spec) error {
 	// establish an ssh connection with the server instance
 	// to setup the build environment (upload build scripts, etc)
 	client, err := dial(
+		ctx,
 		spec.ip,
 		spec.Server.User,
 		e.privatekey,
@@ -168,26 +162,22 @@ func (e *engine) Setup(ctx context.Context, spec *Spec) error {
 
 // Destroy the pipeline environment.
 func (e *engine) Destroy(ctx context.Context, spec *Spec) error {
-	// if the server was not successfully created
-	// exit since there is no droplet to delete.
-	if spec.id == 0 {
-		return nil
-	}
 	logger.FromContext(ctx).
 		WithField("hostname", spec.Server.Name).
 		WithField("ip", spec.ip).
 		WithField("id", spec.id).
 		Debug("terminating server")
 	return platform.Destroy(ctx, platform.DestroyArgs{
-		ID:    spec.id,
-		IP:    spec.ip,
-		Token: spec.Token,
+		ProjectID: spec.Server.ProjectID,
+		Region:    spec.Server.Region,
+		ID:        spec.id,
 	})
 }
 
 // Run runs the pipeline step.
 func (e *engine) Run(ctx context.Context, spec *Spec, step *Step, output io.Writer) (*State, error) {
 	client, err := dial(
+		ctx,
 		spec.ip,
 		spec.Server.User,
 		e.privatekey,
@@ -274,7 +264,9 @@ func (e *engine) Run(ctx context.Context, spec *Spec, step *Step, output io.Writ
 }
 
 // helper function configures and dials the ssh server.
-func dial(server, username, privatekey string) (*ssh.Client, error) {
+func dial(ctx context.Context, server, username, privatekey string) (*ssh.Client, error) {
+	logger := logger.FromContext(ctx).WithField("Server", server)
+
 	if !strings.HasSuffix(server, ":22") {
 		server = server + ":22"
 	}
@@ -288,6 +280,33 @@ func dial(server, username, privatekey string) (*ssh.Client, error) {
 		return nil, err
 	}
 	config.Auth = append(config.Auth, ssh.PublicKeys(signer))
+
+	interval := time.Duration(0)
+poller:
+	for {
+		select {
+		case <-ctx.Done():
+			logger.Debug("cannot connect to ssh server")
+
+			return nil, ctx.Err()
+		case <-time.After(interval):
+			interval = time.Second * 30
+			conn, err := net.DialTimeout("tcp", server, time.Duration(0))
+			if err != nil {
+				logger.WithError(err).Info("Failed to connect to ssh server")
+			}
+			if conn != nil {
+				err = conn.Close()
+				if err != nil {
+					logger.WithError(err).
+						Error("cannot via ssh")
+					return nil, err
+				}
+				break poller
+			}
+		}
+	}
+
 	return ssh.Dial("tcp", server, config)
 }
 

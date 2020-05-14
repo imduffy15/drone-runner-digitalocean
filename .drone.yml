@@ -31,7 +31,7 @@ steps:
   image: plugins/docker
   pull: if-not-exists
   settings:
-    repo: drone/drone-runner-digitalocean
+    repo: drone/drone-runner-gcp
     auto_tag: true
     auto_tag_suffix: linux-amd64
     dockerfile: docker/Dockerfile.linux.amd64
@@ -48,7 +48,7 @@ steps:
   image: plugins/docker
   pull: if-not-exists
   settings:
-    repo: drone/drone-runner-digitalocean
+    repo: drone/drone-runner-gcp
     auto_tag: true
     auto_tag_suffix: linux-arm
     dockerfile: docker/Dockerfile.linux.arm
@@ -65,7 +65,7 @@ steps:
   image: plugins/docker
   pull: if-not-exists
   settings:
-    repo: drone/drone-runner-digitalocean
+    repo: drone/drone-runner-gcp
     auto_tag: true
     auto_tag_suffix: linux-arm64
     dockerfile: docker/Dockerfile.linux.arm64

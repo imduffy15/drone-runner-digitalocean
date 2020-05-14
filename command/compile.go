@@ -11,9 +11,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/drone-runners/drone-runner-digitalocean/command/internal"
-	"github.com/drone-runners/drone-runner-digitalocean/engine/compiler"
-	"github.com/drone-runners/drone-runner-digitalocean/engine/resource"
+	"github.com/drone-runners/drone-runner-gcp/command/internal"
+	"github.com/drone-runners/drone-runner-gcp/engine/compiler"
+	"github.com/drone-runners/drone-runner-gcp/engine/resource"
 	"github.com/drone/envsubst"
 	"github.com/drone/runner-go/environ"
 	"github.com/drone/runner-go/manifest"

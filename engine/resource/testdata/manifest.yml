@@ -3,14 +3,8 @@ kind: signature
 hmac: a8842634682b78946a2
 
 ---
-kind: secret
-type: encrypted
-name: token
-data: f0e4c2f76c58916ec25
-
----
 kind: pipeline
-type: digitalocean
+type: gcp
 name: default
 version: 1
 
@@ -28,9 +22,6 @@ server:
   image: docker-18-04
   region: nyc1
   size: s-1vcpu-1gb
-
-token:
-  from_secret: token
 
 steps:
 - name: build

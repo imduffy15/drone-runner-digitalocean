@@ -8,45 +8,36 @@ package platform
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/drone/runner-go/logger"
-
-	"github.com/digitalocean/godo"
-	"golang.org/x/oauth2"
+	compute "google.golang.org/api/compute/v1"
 )
 
 type (
-	// RegisterArgs provides arguments to register the SSH
-	// public key with the account.
-	RegisterArgs struct {
-		Fingerprint string
-		Name        string
-		Data        string
-		Token       string
-	}
-
 	// DestroyArgs provides arguments to destroy the server
 	// instance.
 	DestroyArgs struct {
-		ID    int
-		IP    string
-		Token string
+		ID        string
+		Region    string
+		ProjectID string
 	}
 
 	// ProvisionArgs provides arguments to provision instances.
 	ProvisionArgs struct {
-		Key    string
-		Image  string
-		Name   string
-		Region string
-		Size   string
-		Token  string
+		Key       string
+		Image     string
+		Name      string
+		Region    string
+		Size      string
+		ProjectID string
+		User      string
 	}
 
 	// Instance represents a provisioned server instance.
 	Instance struct {
-		ID int
+		ID string
 		IP string
 	}
 )
@@ -54,68 +45,116 @@ type (
 // Provision provisions the server instance.
 func Provision(ctx context.Context, args ProvisionArgs) (Instance, error) {
 	res := Instance{}
-	req := &godo.DropletCreateRequest{
-		Name:   args.Name,
-		Region: args.Region,
-		Size:   args.Size,
-		Tags:   []string{"drone"},
-		IPv6:   false,
-		SSHKeys: []godo.DropletCreateSSHKey{
-			{Fingerprint: args.Key},
+
+	prefix := "https://www.googleapis.com/compute/v1/projects/" + args.ProjectID
+
+	sshKey := fmt.Sprintf("%s:%s", args.User, args.Key)
+
+	bool := "FALSE"
+
+	req := &compute.Instance{
+		Name:        args.Name,
+		Description: "Drone builder instance",
+		MachineType: prefix + "/zones/" + args.Region + "/machineTypes/" + args.Size,
+		Disks: []*compute.AttachedDisk{
+			{
+				AutoDelete: true,
+				Boot:       true,
+				Type:       "PERSISTENT",
+				InitializeParams: &compute.AttachedDiskInitializeParams{
+					SourceImage: args.Image,
+				},
+			},
 		},
-		Image: godo.DropletCreateImage{
-			Slug: args.Image,
+		NetworkInterfaces: []*compute.NetworkInterface{
+			{
+				AccessConfigs: []*compute.AccessConfig{
+					{
+						Type: "ONE_TO_ONE_NAT",
+						Name: "External NAT",
+					},
+				},
+				Network: prefix + "/global/networks/default",
+			},
+		},
+		ServiceAccounts: []*compute.ServiceAccount{
+			{
+				Email: "default",
+				Scopes: []string{
+					compute.DevstorageFullControlScope,
+					compute.ComputeScope,
+				},
+			},
+		},
+		Metadata: &compute.Metadata{
+			Items: []*compute.MetadataItems{
+				&compute.MetadataItems{
+					Key:   "ssh-keys",
+					Value: &sshKey,
+				},
+				&compute.MetadataItems{
+					Key:   "enable-oslogin",
+					Value: &bool,
+				},
+			},
 		},
 	}
 
 	logger := logger.FromContext(ctx).
-		WithField("region", req.Region).
-		WithField("image", req.Image.Slug).
-		WithField("size", req.Size).
-		WithField("name", req.Name)
+		WithField("region", args.Region).
+		WithField("image", args.Image).
+		WithField("size", args.Size).
+		WithField("name", args.Name).
+		WithField("project_id", args.ProjectID)
 
 	logger.Debug("instance create")
 
-	client := newClient(ctx, args.Token)
-	droplet, _, err := client.Droplets.Create(ctx, req)
+	client, err := compute.NewService(ctx)
+	if err != nil {
+		logger.WithError(err).Error("unable to create compute service")
+		return res, err
+	}
+	_, err = client.Instances.Insert(args.ProjectID, args.Region, req).Do()
 	if err != nil {
 		logger.WithError(err).Error("cannot create instance")
 		return res, err
 	}
 
 	// record the droplet ID
-	res.ID = droplet.ID
+	res.ID = args.Name
 
-	logger.WithField("name", req.Name).
+	logger.WithField("name", args.Name).
 		Info("instance created")
 
-	// poll the digitalocean endpoint for server updates
-	// and exit when a network address is allocated.
+	// poll the gcp endpoint for server updates
+	// and exit when a network address is allocated and ssh is available.
 	interval := time.Duration(0)
 poller:
 	for {
 		select {
 		case <-ctx.Done():
-			logger.WithField("name", req.Name).
+			logger.WithField("name", args.Name).
 				Debug("cannot ascertain network")
 
 			return res, ctx.Err()
 		case <-time.After(interval):
 			interval = time.Second * 30
 
-			logger.WithField("name", req.Name).
+			logger.WithField("name", args.Name).
 				Debug("find instance network")
 
-			droplet, _, err = client.Droplets.Get(ctx, res.ID)
+			inst, err := client.Instances.Get(args.ProjectID, args.Region, args.Name).Do()
 			if err != nil {
 				logger.WithError(err).
 					Error("cannot find instance")
 				return res, err
 			}
 
-			for _, network := range droplet.Networks.V4 {
-				if network.Type == "public" {
-					res.IP = network.IPAddress
+			for _, iface := range inst.NetworkInterfaces {
+				for _, accessConfig := range iface.AccessConfigs {
+					if accessConfig.Type == "ONE_TO_ONE_NAT" {
+						res.IP = accessConfig.NatIP
+					}
 				}
 			}
 
@@ -125,7 +164,7 @@ poller:
 		}
 	}
 
-	logger.WithField("name", req.Name).
+	logger.WithField("name", args.Name).
 		WithField("ip", res.IP).
 		WithField("id", res.ID).
 		Debug("instance network ready")
@@ -135,43 +174,19 @@ poller:
 
 // Destroy destroys the server instance.
 func Destroy(ctx context.Context, args DestroyArgs) error {
-	client := newClient(ctx, args.Token)
-	_, err := client.Droplets.Delete(ctx, args.ID)
+	logger := logger.FromContext(ctx).
+		WithField("project_id", args.ProjectID).
+		WithField("region", args.Region).WithField("id", args.ID)
+
+	client, err := compute.NewService(ctx)
 	if err != nil {
-		logger.FromContext(ctx).
-			WithError(err).
-			WithField("id", args.ID).
-			WithField("ip", args.IP).
-			Error("cannot terminate server")
+		logger.WithError(err).Error("unable to create compute service")
+		return err
 	}
-	return err
-}
-
-// RegisterKey registers the ssh public key with the account if
-// it is not already registered.
-func RegisterKey(ctx context.Context, args RegisterArgs) error {
-	client := newClient(ctx, args.Token)
-	_, _, err := client.Keys.GetByFingerprint(ctx, args.Fingerprint)
-	if err == nil {
-		return nil
+	_, err = client.Instances.Delete(args.ProjectID, args.Region, args.ID).Do()
+	if err != nil {
+		logger.WithError(err).Error("Unable to delete instance")
+		return err
 	}
-
-	// if the ssh key does not exists we attempt to register
-	// with the digital ocean account.
-	_, _, err = client.Keys.Create(ctx, &godo.KeyCreateRequest{
-		Name:      args.Name,
-		PublicKey: args.Data,
-	})
-	return err
-}
-
-// helper function returns a new digitalocean client.
-func newClient(ctx context.Context, token string) *godo.Client {
-	return godo.NewClient(
-		oauth2.NewClient(ctx, oauth2.StaticTokenSource(
-			&oauth2.Token{
-				AccessToken: token,
-			},
-		)),
-	)
+	return nil
 }

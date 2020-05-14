@@ -8,10 +8,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/drone-runners/drone-runner-digitalocean/engine"
-	"github.com/drone-runners/drone-runner-digitalocean/engine/resource"
-	"github.com/drone-runners/drone-runner-digitalocean/internal/match"
-	"github.com/drone-runners/drone-runner-digitalocean/runtime"
+	"github.com/drone-runners/drone-runner-gcp/engine"
+	"github.com/drone-runners/drone-runner-gcp/engine/resource"
+	"github.com/drone-runners/drone-runner-gcp/internal/match"
+	"github.com/drone-runners/drone-runner-gcp/runtime"
 
 	"github.com/drone/runner-go/client"
 	"github.com/drone/runner-go/handler/router"

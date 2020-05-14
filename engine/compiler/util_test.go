@@ -7,8 +7,8 @@ package compiler
 import (
 	"testing"
 
-	"github.com/drone-runners/drone-runner-digitalocean/engine"
-	"github.com/drone-runners/drone-runner-digitalocean/engine/resource"
+	"github.com/drone-runners/drone-runner-gcp/engine"
+	"github.com/drone-runners/drone-runner-gcp/engine/resource"
 	"github.com/drone/runner-go/manifest"
 
 	"github.com/google/go-cmp/cmp"

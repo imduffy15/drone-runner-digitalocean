@@ -14,8 +14,8 @@ import (
 	"testing"
 
 	"github.com/dchest/uniuri"
-	"github.com/drone-runners/drone-runner-digitalocean/engine"
-	"github.com/drone-runners/drone-runner-digitalocean/engine/resource"
+	"github.com/drone-runners/drone-runner-gcp/engine"
+	"github.com/drone-runners/drone-runner-gcp/engine/resource"
 	"github.com/drone/drone-go/drone"
 	"github.com/drone/runner-go/manifest"
 	"github.com/drone/runner-go/secret"
@@ -103,7 +103,6 @@ func TestCompile_Secrets(t *testing.T) {
 	compiler.Manifest = manifest
 	compiler.Pipeline = manifest.Resources[0].(*resource.Pipeline)
 	compiler.Secret = secret.StaticVars(map[string]string{
-		"token":       "3DA541559918A808C2402BBA5012F6C60B27661C",
 		"password":    "password",
 		"my_username": "octocat",
 	})
@@ -127,9 +126,6 @@ func TestCompile_Secrets(t *testing.T) {
 		// TODO(bradrydzewski) ordering is not guaranteed. this
 		// unit tests needs to be adjusted accordingly.
 		t.Skipf(diff)
-	}
-	if got, want := ir.Token, "3DA541559918A808C2402BBA5012F6C60B27661C"; got != want {
-		t.Errorf("Want token %s, got %s", want, got)
 	}
 }
 

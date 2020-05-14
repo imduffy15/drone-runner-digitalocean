@@ -1,6 +1,6 @@
 ---
 kind: pipeline
-type: digitalocean
+type: gcp
 
 steps:
  foo: bar

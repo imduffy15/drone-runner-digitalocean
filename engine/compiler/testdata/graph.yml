@@ -1,5 +1,5 @@
 kind: pipeline
-type: digitalocean
+type: gcp
 name: default
 
 server:

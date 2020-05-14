@@ -9,6 +9,6 @@
 
 4. Build images
 
-    docker build -t drone/drone-runner-digitalocean:latest-linux-amd64 -f docker/Dockerfile.linux.amd64 .
-    docker build -t drone/drone-runner-digitalocean:latest-linux-arm64 -f docker/Dockerfile.linux.arm64 .
-    docker build -t drone/drone-runner-digitalocean:latest-linux-arm   -f docker/Dockerfile.linux.arm   .
+    docker build -t drone/drone-runner-gcp:latest-linux-amd64 -f docker/Dockerfile.linux.amd64 .
+    docker build -t drone/drone-runner-gcp:latest-linux-arm64 -f docker/Dockerfile.linux.arm64 .
+    docker build -t drone/drone-runner-gcp:latest-linux-arm   -f docker/Dockerfile.linux.arm   .

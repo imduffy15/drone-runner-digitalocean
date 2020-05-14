@@ -24,18 +24,11 @@ func TestParse(t *testing.T) {
 			Kind: "signature",
 			Hmac: "a8842634682b78946a2",
 		},
-		&manifest.Secret{
-			Kind: "secret",
-			Type: "encrypted",
-			Name: "token",
-			Data: "f0e4c2f76c58916ec25",
-		},
 		&Pipeline{
 			Kind:    "pipeline",
-			Type:    "digitalocean",
+			Type:    "gcp",
 			Name:    "default",
 			Version: "1",
-			Token:   manifest.Variable{Secret: "token"},
 			Server: Server{
 				Image:  "docker-18-04",
 				Region: "nyc1",
@@ -113,7 +106,7 @@ func TestParseNoMatch(t *testing.T) {
 func TestMatch(t *testing.T) {
 	r := &manifest.RawResource{
 		Kind: "pipeline",
-		Type: "digitalocean",
+		Type: "gcp",
 	}
 	if match(r) == false {
 		t.Errorf("Expect match, got false")
@@ -121,7 +114,7 @@ func TestMatch(t *testing.T) {
 
 	r = &manifest.RawResource{
 		Kind: "approval",
-		Type: "digitalocean",
+		Type: "gcp",
 	}
 	if match(r) == true {
 		t.Errorf("Expect kind mismatch, got true")
@@ -139,7 +132,6 @@ func TestMatch(t *testing.T) {
 
 func TestLint(t *testing.T) {
 	p := new(Pipeline)
-	p.Token = manifest.Variable{Secret: "token"}
 	p.Server = Server{
 		Image:  "docker-18-04",
 		Region: "nyc1",
@@ -168,7 +160,6 @@ func TestLint(t *testing.T) {
 
 func TestLint_ServerError(t *testing.T) {
 	p := new(Pipeline)
-	p.Token = manifest.Variable{Secret: "token"}
 	p.Server = Server{
 		Image:  "docker-18-04",
 		Region: "nyc1",
@@ -177,10 +168,5 @@ func TestLint_ServerError(t *testing.T) {
 	if err := lint(p); err != nil {
 		t.Errorf("Expect no lint error, got %s", err)
 		return
-	}
-
-	p.Token = manifest.Variable{}
-	if err := lint(p); err == nil {
-		t.Errorf("Expect lint error for missing token")
 	}
 }

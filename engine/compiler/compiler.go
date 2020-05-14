@@ -9,8 +9,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/drone-runners/drone-runner-digitalocean/engine"
-	"github.com/drone-runners/drone-runner-digitalocean/engine/resource"
+	"github.com/drone-runners/drone-runner-gcp/engine"
+	"github.com/drone-runners/drone-runner-gcp/engine/resource"
 
 	"github.com/drone/drone-go/drone"
 	"github.com/drone/runner-go/clone"
@@ -76,7 +76,6 @@ func (c *Compiler) Compile(ctx context.Context) *engine.Spec {
 	os := c.Pipeline.Platform.OS
 
 	spec := &engine.Spec{
-		Token: c.Pipeline.Token.Value,
 		Platform: engine.Platform{
 			OS:      c.Pipeline.Platform.OS,
 			Arch:    c.Pipeline.Platform.Arch,
@@ -84,11 +83,12 @@ func (c *Compiler) Compile(ctx context.Context) *engine.Spec {
 			Version: c.Pipeline.Platform.Version,
 		},
 		Server: engine.Server{
-			Name:   fmt.Sprintf("drone-temp-%s", random()),
-			Image:  c.Pipeline.Server.Image,
-			Region: c.Pipeline.Server.Region,
-			Size:   c.Pipeline.Server.Size,
-			User:   c.Pipeline.Server.User,
+			Name:      strings.ToLower(fmt.Sprintf("drone-temp-%s", random())),
+			Image:     c.Pipeline.Server.Image,
+			Region:    c.Pipeline.Server.Region,
+			Size:      c.Pipeline.Server.Size,
+			User:      c.Pipeline.Server.User,
+			ProjectID: c.Pipeline.Server.ProjectID,
 		},
 	}
 
@@ -97,11 +97,6 @@ func (c *Compiler) Compile(ctx context.Context) *engine.Spec {
 		spec.Server.User = "Administrator"
 	case spec.Server.User == "":
 		spec.Server.User = "root"
-	}
-
-	// maybe load the digital ocean api token from secret
-	if s, ok := c.findSecret(ctx, c.Pipeline.Token.Secret); ok {
-		spec.Token = s
 	}
 
 	// create the root directory

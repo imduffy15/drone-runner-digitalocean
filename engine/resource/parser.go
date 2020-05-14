@@ -37,11 +37,6 @@ func match(r *manifest.RawResource) bool {
 
 // lint returns an error if any pipeline values are invalid.
 func lint(pipeline *Pipeline) error {
-	// ensure server configuration provided.
-	if pipeline.Token.Value == "" && pipeline.Token.Secret == "" {
-		return errors.New("Linter: invalid or missing API token")
-	}
-
 	// ensure pipeline steps are not unique.
 	names := map[string]struct{}{}
 	for _, step := range pipeline.Steps {

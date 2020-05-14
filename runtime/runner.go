@@ -13,9 +13,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/drone-runners/drone-runner-digitalocean/engine"
-	"github.com/drone-runners/drone-runner-digitalocean/engine/compiler"
-	"github.com/drone-runners/drone-runner-digitalocean/engine/resource"
+	"github.com/drone-runners/drone-runner-gcp/engine"
+	"github.com/drone-runners/drone-runner-gcp/engine/compiler"
+	"github.com/drone-runners/drone-runner-gcp/engine/resource"
 
 	"github.com/drone/drone-go/drone"
 	"github.com/drone/envsubst"
